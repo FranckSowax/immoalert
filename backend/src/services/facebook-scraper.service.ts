@@ -275,7 +275,7 @@ export class FacebookScraperService {
   /**
    * Process a single post — returns true if a new listing was created
    */
-  private async processPost(post: FacebookPost, group: { id: string; name: string; keywords: string[] }): Promise<boolean> {
+  async processPost(post: FacebookPost, group: { id: string; name: string; keywords: string[] }): Promise<boolean> {
     if (!post.id) return false;
 
     // Check if post already exists

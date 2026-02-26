@@ -40,6 +40,7 @@ router.get('/admin/groups', (req, res) => adminController.getGroups(req, res));
 router.post('/admin/groups', (req, res) => adminController.addGroup(req, res));
 router.put('/admin/groups/:id', (req, res) => adminController.updateGroup(req, res));
 router.delete('/admin/groups/:id', (req, res) => adminController.deleteGroup(req, res));
+router.post('/admin/groups/:id/scrape', (req, res) => adminController.scrapeGroup(req, res));
 
 // Admin routes - Actions
 router.post('/admin/actions/scrape', (req, res) => adminController.triggerScrape(req, res));

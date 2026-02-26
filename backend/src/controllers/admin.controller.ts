@@ -340,6 +340,61 @@ export class AdminController {
   }
 
   /**
+   * Scrape a single group and return results synchronously
+   */
+  async scrapeGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const group = await prisma.facebookGroup.findUnique({ where: { id } });
+      if (!group) {
+        res.status(404).json({ error: 'Group not found' });
+        return;
+      }
+
+      const result = await facebookScraperService.getGroupPosts(group.groupId);
+
+      if (!result.success) {
+        res.status(502).json({ error: result.error || 'Failed to fetch posts from Facebook' });
+        return;
+      }
+
+      let newPosts = 0;
+      for (const post of result.posts) {
+        const created = await facebookScraperService.processPost(post, group);
+        if (created) newPosts++;
+      }
+
+      // Update group stats
+      await prisma.facebookGroup.update({
+        where: { id },
+        data: {
+          lastScrapedAt: new Date(),
+          totalPosts: { increment: newPosts },
+        },
+      });
+
+      // Fetch the latest listings for this group to return
+      const listings = await prisma.scrapedListing.findMany({
+        where: { groupId: id },
+        orderBy: { scrapedAt: 'desc' },
+        take: 50,
+      });
+
+      res.json({
+        success: true,
+        totalPosts: result.posts.length,
+        newPosts,
+        cursor: result.cursor,
+        listings,
+      });
+    } catch (error) {
+      console.error('Error scraping group:', error);
+      res.status(500).json({ error: 'Failed to scrape group' });
+    }
+  }
+
+  /**
    * Trigger manual scrape
    */
   async triggerScrape(req: Request, res: Response): Promise<void> {

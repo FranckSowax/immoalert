@@ -136,7 +136,7 @@ export class FacebookScraperService {
    * Get posts from a group with automatic pagination
    * Fetches up to `maxPages` pages (API returns ~3 posts per page)
    */
-  async getGroupPosts(groupId: string, maxPages: number = 10): Promise<ScrapingResult> {
+  async getGroupPosts(groupId: string, maxPages: number = 3): Promise<ScrapingResult> {
     const allPosts: FacebookPost[] = [];
     let currentCursor: string | undefined;
     let lastCursor: string | null = null;

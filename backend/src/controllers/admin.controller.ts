@@ -272,9 +272,21 @@ export class AdminController {
     try {
       const { groupId, name, keywords, priority } = req.body;
 
-      const group = await prisma.facebookGroup.create({
-        data: {
+      if (!groupId || !name) {
+        res.status(400).json({ error: 'groupId and name are required' });
+        return;
+      }
+
+      const group = await prisma.facebookGroup.upsert({
+        where: { groupId },
+        create: {
           groupId,
+          name,
+          keywords: keywords || [],
+          priority: priority || 0,
+          isActive: true,
+        },
+        update: {
           name,
           keywords: keywords || [],
           priority: priority || 0,

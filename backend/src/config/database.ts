@@ -1,12 +1,23 @@
 import { PrismaClient } from '@prisma/client';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Ensure pgbouncer=true is set for Supabase Transaction-mode pooler
+const ensurePgBouncer = (url?: string): string | undefined => {
+  if (!url) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  if (!url.includes('pgbouncer=true')) {
+    return `${url}${separator}pgbouncer=true`;
+  }
+  return url;
+};
+
 // Prisma client singleton
 const prismaClientSingleton = () => {
   return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' 
-      ? ['query', 'error', 'warn'] 
+    log: process.env.NODE_ENV === 'development'
+      ? ['query', 'error', 'warn']
       : ['error'],
+    datasourceUrl: ensurePgBouncer(process.env.DATABASE_URL),
   });
 };
 

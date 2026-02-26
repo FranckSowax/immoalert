@@ -20,10 +20,12 @@ export default function Groups() {
   
   const queryClient = useQueryClient()
   
-  const { data: groups, isLoading } = useQuery({
+  const { data: groupsData, isLoading } = useQuery({
     queryKey: ['groups'],
     queryFn: () => api.get('/admin/groups').then(res => res.data),
   })
+
+  const groups: Group[] = Array.isArray(groupsData) ? groupsData : groupsData?.groups || []
 
   const addGroup = useMutation({
     mutationFn: (group: any) => api.post('/admin/groups', group),
@@ -65,7 +67,7 @@ export default function Groups() {
 
       {/* Groups Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groups?.map((group: Group) => (
+        {groups.map((group: Group) => (
           <div key={group.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -124,7 +126,7 @@ export default function Groups() {
         ))}
       </div>
 
-      {groups?.length === 0 && (
+      {groups.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <Facebook className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium">Aucun groupe configuré</p>

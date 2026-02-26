@@ -261,7 +261,8 @@ export class AdminController {
       res.json(groups);
     } catch (error) {
       console.error('Error fetching groups:', error);
-      res.status(500).json({ error: 'Failed to fetch groups' });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: 'Failed to fetch groups', details: errMsg });
     }
   }
 
@@ -390,7 +391,8 @@ export class AdminController {
       });
     } catch (error) {
       console.error('Error scraping group:', error);
-      res.status(500).json({ error: 'Failed to scrape group' });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: 'Failed to scrape group', details: errMsg });
     }
   }
 

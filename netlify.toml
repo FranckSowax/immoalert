@@ -5,7 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--version"
+  NPM_FLAGS = "--include=optional"
 
 # SPA redirect - handle client-side routing
 [[redirects]]

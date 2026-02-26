@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: immoalert-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - WHAPI_TOKEN=${WHAPI_TOKEN}
+      - WHAPI_API_URL=${WHAPI_API_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
+      - RAPIDAPI_HOST=${RAPIDAPI_HOST}
+      - JWT_SECRET=${JWT_SECRET}
+      - SCRAPER_INTERVAL_MINUTES=${SCRAPER_INTERVAL_MINUTES:-30}
+      - ENRICHMENT_INTERVAL_MINUTES=${ENRICHMENT_INTERVAL_MINUTES:-5}
+      - MATCHING_INTERVAL_MINUTES=${MATCHING_INTERVAL_MINUTES:-3}
+      - AI_CONFIDENCE_THRESHOLD=${AI_CONFIDENCE_THRESHOLD:-0.7}
+      - MAX_LISTINGS_PER_BATCH=${MAX_LISTINGS_PER_BATCH:-50}
+    restart: unless-stopped
+    networks:
+      - immoalert-network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: immoalert-frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - immoalert-network
+
+networks:
+  immoalert-network:
+    driver: bridge

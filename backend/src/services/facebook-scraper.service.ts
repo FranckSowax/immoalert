@@ -102,10 +102,10 @@ export class FacebookScraperService {
   }
 
   /**
-   * Get posts from a specific group
+   * Get posts from a specific group (single page)
    * GET /group/posts?group_id=...&sorting_order=CHRONOLOGICAL&cursor=...
    */
-  async getGroupPosts(groupId: string, cursor?: string): Promise<ScrapingResult> {
+  async getGroupPostsPage(groupId: string, cursor?: string): Promise<ScrapingResult> {
     try {
       const params: Record<string, string> = {
         group_id: groupId,
@@ -130,6 +130,37 @@ export class FacebookScraperService {
         error: 'Failed to fetch group posts',
       };
     }
+  }
+
+  /**
+   * Get posts from a group with automatic pagination
+   * Fetches up to `maxPages` pages (API returns ~3 posts per page)
+   */
+  async getGroupPosts(groupId: string, maxPages: number = 10): Promise<ScrapingResult> {
+    const allPosts: FacebookPost[] = [];
+    let currentCursor: string | undefined;
+    let lastCursor: string | null = null;
+
+    for (let page = 0; page < maxPages; page++) {
+      const result = await this.getGroupPostsPage(groupId, currentCursor);
+
+      if (!result.success) {
+        if (page === 0) return result;
+        break;
+      }
+
+      allPosts.push(...result.posts);
+      lastCursor = result.cursor || null;
+
+      if (!result.cursor || result.posts.length === 0) break;
+      currentCursor = result.cursor;
+    }
+
+    return {
+      success: true,
+      posts: allPosts,
+      cursor: lastCursor,
+    };
   }
 
   /**

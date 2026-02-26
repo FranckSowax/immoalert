@@ -51,6 +51,7 @@ interface ScrapedListing {
 
 interface ScrapeResult {
   success: boolean
+  totalFetched?: number
   totalPosts: number
   newPosts: number
   posts: FacebookPost[]
@@ -401,7 +402,7 @@ export default function Groups() {
                           onClick={() => setExpandedGroup(isExpanded ? null : group.id)}
                           className="flex items-center text-xs text-primary-600 hover:text-primary-800"
                         >
-                          {result.posts.length} post(s) trouvé(s)
+                          {result.posts.length} annonce(s) pertinente(s)
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
                         </button>
                       )}
@@ -418,7 +419,13 @@ export default function Groups() {
                   {result && (
                     <div className={`mt-3 p-3 rounded-lg text-sm ${result.success ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
                       {result.success ? (
-                        <span>{result.totalPosts} post(s) récupéré(s), <strong>{result.newPosts} nouvelle(s) annonce(s)</strong></span>
+                        <span>
+                          {result.totalFetched != null && result.totalFetched !== result.totalPosts
+                            ? <>{result.totalFetched} post(s) scannés, <strong>{result.totalPosts} annonce(s) pertinente(s)</strong></>
+                            : <>{result.totalPosts} annonce(s) trouvée(s)</>
+                          }
+                          {result.newPosts > 0 && <>, <strong>{result.newPosts} nouvelle(s)</strong> sauvegardée(s)</>}
+                        </span>
                       ) : (
                         <span>Erreur lors du scan. Vérifiez l'ID du groupe.</span>
                       )}

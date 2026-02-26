@@ -360,8 +360,16 @@ export class AdminController {
         return;
       }
 
+      // Filter posts by group keywords (if configured)
+      const keywords = group.keywords || [];
+      const filteredPosts = keywords.length > 0
+        ? result.posts.filter(post =>
+            keywords.some(kw => post.text.toLowerCase().includes(kw.toLowerCase()))
+          )
+        : result.posts;
+
       let newPosts = 0;
-      for (const post of result.posts) {
+      for (const post of filteredPosts) {
         const created = await facebookScraperService.processPost(post, group);
         if (created) newPosts++;
       }
@@ -384,10 +392,11 @@ export class AdminController {
 
       res.json({
         success: true,
-        totalPosts: result.posts.length,
+        totalFetched: result.posts.length,
+        totalPosts: filteredPosts.length,
         newPosts,
         cursor: result.cursor,
-        posts: result.posts,
+        posts: filteredPosts,
         listings,
       });
     } catch (error) {

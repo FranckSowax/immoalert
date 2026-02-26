@@ -1,24 +1,36 @@
 [build]
-  base = "frontend"
-  command = "npm run build"
-  publish = "dist"
+  command = "npx prisma generate --schema=backend/prisma/schema.prisma && cd frontend && npm install && npm run build"
+  publish = "frontend/dist"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--include=optional"
 
-# SPA redirect - handle client-side routing
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@prisma/client", ".prisma"]
+  included_files = ["node_modules/.prisma/**", "node_modules/@prisma/client/**", "node_modules/@prisma/engines/**", "backend/prisma/schema.prisma"]
+
+# API proxy to serverless function — MUST be before SPA catch-all
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/api/:splat"
+  status = 200
+  force = true
+
+# Health check
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
+  force = true
+
+# SPA redirect - handle client-side routing (MUST be last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# API proxy to backend (configure with your actual backend URL)
-[[redirects]]
-  from = "/api/*"
-  to = "https://your-backend-url.com/api/:splat"
-  status = 200
-  force = true
 
 # Security headers
 [[headers]]

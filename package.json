@@ -1,0 +1,27 @@
+{
+  "name": "immoalert",
+  "private": true,
+  "description": "ImmoAlert - Real Estate SaaS with WhatsApp integration",
+  "dependencies": {
+    "@prisma/client": "^5.10.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.7",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
+    "openai": "^4.28.4",
+    "serverless-http": "^4.0.0",
+    "winston": "^3.12.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "prisma": "^5.10.0"
+  },
+  "prisma": {
+    "schema": "backend/prisma/schema.prisma"
+  }
+}

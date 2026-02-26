@@ -35,6 +35,7 @@ router.put('/admin/listings/:id', (req, res) => adminController.updateListing(re
 router.delete('/admin/listings/:id', (req, res) => adminController.deleteListing(req, res));
 
 // Admin routes - Groups
+router.get('/admin/groups/search', (req, res) => adminController.searchGroups(req, res));
 router.get('/admin/groups', (req, res) => adminController.getGroups(req, res));
 router.post('/admin/groups', (req, res) => adminController.addGroup(req, res));
 router.put('/admin/groups/:id', (req, res) => adminController.updateGroup(req, res));

@@ -229,6 +229,27 @@ export class AdminController {
   }
 
   /**
+   * Search Facebook groups by keyword
+   */
+  async searchGroups(req: Request, res: Response): Promise<void> {
+    try {
+      const query = req.query.q as string;
+      const location = req.query.location as string | undefined;
+
+      if (!query) {
+        res.status(400).json({ error: 'Query parameter "q" is required' });
+        return;
+      }
+
+      const results = await facebookScraperService.searchGroups(query, location);
+      res.json(results);
+    } catch (error) {
+      console.error('Error searching groups:', error);
+      res.status(500).json({ error: 'Failed to search Facebook groups' });
+    }
+  }
+
+  /**
    * Get all Facebook groups
    */
   async getGroups(req: Request, res: Response): Promise<void> {

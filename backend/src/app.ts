@@ -32,8 +32,25 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Database connection (lazy, once per cold start)
+// Health check — BEFORE DB middleware so it always works for diagnostics
 let dbConnected = false;
+app.get('/health', (_req, res) => {
+  res.json({
+    status: dbConnected ? 'healthy' : 'degraded',
+    database: dbConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'MISSING',
+      RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'set' : 'MISSING',
+      RAPIDAPI_HOST: process.env.RAPIDAPI_HOST ? 'set' : 'MISSING',
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'set' : 'MISSING',
+      WHAPI_TOKEN: process.env.WHAPI_TOKEN ? 'set' : 'MISSING',
+    },
+  });
+});
+
+// Database connection (lazy, once per cold start)
 app.use(async (_req, res, next) => {
   if (!dbConnected) {
     try {
@@ -50,23 +67,6 @@ app.use(async (_req, res, next) => {
 
 // Routes
 app.use('/api', routes);
-
-// Health check endpoint — diagnostic info
-app.get('/health', (_req, res) => {
-  res.json({
-    status: dbConnected ? 'healthy' : 'degraded',
-    database: dbConnected ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    env: {
-      DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'MISSING',
-      RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'set' : 'MISSING',
-      RAPIDAPI_HOST: process.env.RAPIDAPI_HOST ? 'set' : 'MISSING',
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'set' : 'MISSING',
-      WHAPI_TOKEN: process.env.WHAPI_TOKEN ? 'set' : 'MISSING',
-    },
-  });
-});
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

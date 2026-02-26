@@ -57,8 +57,9 @@ app.use(async (_req, res, next) => {
       await connectDatabase();
       dbConnected = true;
     } catch (error) {
-      console.error('Database connection failed:', error);
-      res.status(500).json({ error: 'Database connection failed. Check DATABASE_URL env var.' });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error('Database connection failed:', errMsg);
+      res.status(500).json({ error: 'Database connection failed', details: errMsg });
       return;
     }
   }

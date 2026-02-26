@@ -234,14 +234,14 @@ export class AdminController {
   async searchGroups(req: Request, res: Response): Promise<void> {
     try {
       const query = req.query.q as string;
-      const location = req.query.location as string | undefined;
+      const cursor = req.query.cursor as string | undefined;
 
       if (!query) {
         res.status(400).json({ error: 'Query parameter "q" is required' });
         return;
       }
 
-      const results = await facebookScraperService.searchGroups(query, location);
+      const results = await facebookScraperService.searchGroups(query, cursor);
       res.json(results);
     } catch (error) {
       console.error('Error searching groups:', error);

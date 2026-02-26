@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Facebook, Trash2, CheckCircle, XCircle, Plus, Link, X, Tag } from 'lucide-react'
+import { Facebook, Trash2, CheckCircle, XCircle, Plus, Link, X, Tag, Search, Loader2, Users } from 'lucide-react'
 import { api } from '../services/api'
 
 interface Group {
@@ -16,12 +16,20 @@ interface Group {
   validPosts?: number
 }
 
+interface SearchResult {
+  id?: string
+  name?: string
+  description?: string
+  members_count?: number
+  privacy?: string
+  url?: string
+  image?: { uri?: string }
+}
+
 function extractGroupId(input: string): string {
   const trimmed = input.trim()
-  // Handle full URLs: https://facebook.com/groups/123456 or https://www.facebook.com/groups/my-group-name
   const urlMatch = trimmed.match(/facebook\.com\/groups\/([^/?&#]+)/)
   if (urlMatch) return urlMatch[1]
-  // Otherwise treat as raw ID
   return trimmed
 }
 
@@ -31,6 +39,13 @@ export default function Groups() {
   const [groupName, setGroupName] = useState('')
   const [keywordsInput, setKeywordsInput] = useState('')
   const [addError, setAddError] = useState('')
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -79,6 +94,42 @@ export default function Groups() {
     addGroup.mutate({ groupId, name: groupName.trim(), keywords })
   }
 
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return
+
+    setIsSearching(true)
+    setSearchError('')
+    setSearchResults([])
+
+    try {
+      const res = await api.get('/admin/groups/search', { params: { q: searchQuery } })
+      const data = res.data
+      const results = data?.results || data?.groups || data?.data || []
+      setSearchResults(Array.isArray(results) ? results : [])
+
+      if (Array.isArray(results) && results.length === 0) {
+        setSearchError('Aucun groupe trouvé. Essayez d\'autres mots-clés ou ajoutez le groupe manuellement.')
+      }
+    } catch {
+      setSearchError('Erreur lors de la recherche. Vérifiez la clé API RapidAPI.')
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleAddFromSearch = (result: SearchResult) => {
+    const groupId = result.id || ''
+    const name = result.name || 'Groupe Facebook'
+
+    if (!groupId) return
+
+    // Check if already monitored
+    const alreadyMonitored = groups.some(g => g.groupId === groupId)
+    if (alreadyMonitored) return
+
+    addGroup.mutate({ groupId, name, keywords: [] })
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -86,25 +137,129 @@ export default function Groups() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Groupes Facebook</h1>
           <p className="text-gray-500 mt-1">
-            Ajoutez des groupes Facebook à surveiller. Les posts seront automatiquement scrapés, classifiés par IA, et envoyés aux utilisateurs correspondants.
+            Recherchez ou ajoutez des groupes Facebook à surveiller.
           </p>
         </div>
-        {!showAddForm && (
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter un groupe
-          </button>
-        )}
+        <div className="flex gap-2">
+          {!showSearch && (
+            <button
+              onClick={() => { setShowSearch(true); setShowAddForm(false) }}
+              className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Rechercher
+            </button>
+          )}
+          {!showAddForm && (
+            <button
+              onClick={() => { setShowAddForm(true); setShowSearch(false) }}
+              className="flex items-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajout manuel
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Add Group Form */}
+      {/* Search Panel */}
+      {showSearch && (
+        <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Rechercher des groupes Facebook</h2>
+            <button
+              onClick={() => { setShowSearch(false); setSearchResults([]); setSearchError('') }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex gap-3">
+            <input
+              type="text"
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Ex: immobilier Libreville, location appartement Gabon..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            />
+            <button
+              onClick={handleSearch}
+              disabled={isSearching || !searchQuery.trim()}
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Rechercher
+                </>
+              )}
+            </button>
+          </div>
+
+          {searchError && (
+            <p className="text-sm text-amber-600 mt-3">{searchError}</p>
+          )}
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-gray-500">{searchResults.length} groupe(s) trouvé(s)</p>
+              {searchResults.map((result, idx) => {
+                const isMonitored = groups.some(g => g.groupId === result.id)
+                return (
+                  <div key={result.id || idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      {result.image?.uri ? (
+                        <img src={result.image.uri} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                      ) : (
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <Facebook className="w-6 h-6 text-blue-600" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{result.name || 'Groupe sans nom'}</p>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          {result.members_count && (
+                            <span className="flex items-center">
+                              <Users className="w-3 h-3 mr-1" />
+                              {result.members_count.toLocaleString()} membres
+                            </span>
+                          )}
+                          {result.privacy && <span>{result.privacy}</span>}
+                        </div>
+                        {result.description && (
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-1">{result.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleAddFromSearch(result)}
+                      disabled={isMonitored || addGroup.isPending}
+                      className={`ml-4 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        isMonitored
+                          ? 'bg-green-100 text-green-700 cursor-default'
+                          : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50'
+                      }`}
+                    >
+                      {isMonitored ? 'Surveillé' : 'Ajouter'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Group Form (Manual) */}
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-primary-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Ajouter un groupe Facebook</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Ajouter un groupe manuellement</h2>
             <button
               onClick={() => { setShowAddForm(false); setAddError('') }}
               className="text-gray-400 hover:text-gray-600"
@@ -205,16 +360,27 @@ export default function Groups() {
         <div className="text-center py-16 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
           <Facebook className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium">Aucun groupe surveillé</p>
-          <p className="text-sm mt-1">Ajoutez votre premier groupe Facebook pour commencer la surveillance</p>
-          {!showAddForm && (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="mt-4 inline-flex items-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter un groupe
-            </button>
-          )}
+          <p className="text-sm mt-1">Recherchez ou ajoutez votre premier groupe Facebook</p>
+          <div className="mt-4 flex justify-center gap-3">
+            {!showSearch && (
+              <button
+                onClick={() => setShowSearch(true)}
+                className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Rechercher
+              </button>
+            )}
+            {!showAddForm && (
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="inline-flex items-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Ajout manuel
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -266,6 +432,9 @@ export default function Groups() {
                     <p>Dernier scan : {new Date(group.lastScrapedAt).toLocaleDateString('fr-FR')}</p>
                   ) : (
                     <p>Pas encore scanné</p>
+                  )}
+                  {group.totalPosts != null && group.totalPosts > 0 && (
+                    <p>{group.totalPosts} posts récupérés</p>
                   )}
                 </div>
                 <button

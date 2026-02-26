@@ -4,11 +4,13 @@ import { prisma } from '../config/database';
 export interface FacebookPost {
   id: string;
   text: string;
+  url?: string;
   author?: {
     name: string;
     id: string;
   };
   time?: string;
+  timestamp?: number;
   images?: string[];
   likes?: number;
   comments?: number;
@@ -18,24 +20,22 @@ export interface FacebookPost {
 export interface ScrapingResult {
   success: boolean;
   posts: FacebookPost[];
+  cursor?: string | null;
   error?: string;
 }
 
 export class FacebookScraperService {
   private client: AxiosInstance;
-  private baseURL: string;
-  private headers: Record<string, string>;
 
   constructor() {
-    this.baseURL = `https://${process.env.RAPIDAPI_HOST || 'facebook-scraper3.p.rapidapi.com'}`;
-    this.headers = {
-      'x-rapidapi-host': process.env.RAPIDAPI_HOST || 'facebook-scraper3.p.rapidapi.com',
-      'x-rapidapi-key': process.env.RAPIDAPI_KEY || '',
-    };
+    const host = process.env.RAPIDAPI_HOST || 'facebook-scraper3.p.rapidapi.com';
 
     this.client = axios.create({
-      baseURL: this.baseURL,
-      headers: this.headers,
+      baseURL: `https://${host}`,
+      headers: {
+        'x-rapidapi-host': host,
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY || '',
+      },
       timeout: 60000,
     });
 
@@ -54,13 +54,14 @@ export class FacebookScraperService {
 
   /**
    * Search for Facebook groups
+   * GET /search/groups?query=...&cursor=...
    */
-  async searchGroups(query: string, location?: string): Promise<any> {
+  async searchGroups(query: string, cursor?: string): Promise<any> {
     try {
-      const searchQuery = location ? `${query} ${location}` : query;
-      const response = await this.client.get('/search/groups', {
-        params: { query: searchQuery, limit: 20 },
-      });
+      const params: Record<string, string> = { query };
+      if (cursor) params.cursor = cursor;
+
+      const response = await this.client.get('/search/groups', { params });
       return response.data;
     } catch (error) {
       console.error('Error searching groups:', error);
@@ -69,19 +70,57 @@ export class FacebookScraperService {
   }
 
   /**
-   * Get posts from a specific group
+   * Get group details (name, description, members...)
+   * GET /group/details?url=https://www.facebook.com/groups/...
    */
-  async getGroupPosts(groupId: string, limit: number = 20): Promise<ScrapingResult> {
+  async getGroupDetails(groupUrl: string): Promise<any> {
     try {
-      const response = await this.client.get('/group/posts', {
-        params: { id: groupId, limit },
+      const response = await this.client.get('/group/details', {
+        params: { url: groupUrl },
       });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching group details:', error);
+      throw new Error('Failed to fetch group details');
+    }
+  }
+
+  /**
+   * Get group numeric ID from URL
+   * GET /group/id?url=https://www.facebook.com/groups/...
+   */
+  async getGroupId(groupUrl: string): Promise<any> {
+    try {
+      const response = await this.client.get('/group/id', {
+        params: { url: groupUrl },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching group ID:', error);
+      throw new Error('Failed to fetch group ID');
+    }
+  }
+
+  /**
+   * Get posts from a specific group
+   * GET /group/posts?group_id=...&sorting_order=CHRONOLOGICAL&cursor=...
+   */
+  async getGroupPosts(groupId: string, cursor?: string): Promise<ScrapingResult> {
+    try {
+      const params: Record<string, string> = {
+        group_id: groupId,
+        sorting_order: 'CHRONOLOGICAL',
+      };
+      if (cursor) params.cursor = cursor;
+
+      const response = await this.client.get('/group/posts', { params });
 
       const posts = this.parsePosts(response.data);
-      
+
       return {
         success: true,
         posts,
+        cursor: response.data?.cursor || null,
       };
     } catch (error) {
       console.error(`Error fetching posts for group ${groupId}:`, error);
@@ -89,6 +128,35 @@ export class FacebookScraperService {
         success: false,
         posts: [],
         error: 'Failed to fetch group posts',
+      };
+    }
+  }
+
+  /**
+   * Search posts within groups
+   * GET /search/groups_posts?query=...&group_id=...&cursor=...
+   */
+  async searchGroupPosts(query: string, groupId?: string, cursor?: string): Promise<ScrapingResult> {
+    try {
+      const params: Record<string, string> = { query };
+      if (groupId) params.group_id = groupId;
+      if (cursor) params.cursor = cursor;
+
+      const response = await this.client.get('/search/groups_posts', { params });
+
+      const posts = this.parsePosts(response.data);
+
+      return {
+        success: true,
+        posts,
+        cursor: response.data?.cursor || null,
+      };
+    } catch (error) {
+      console.error('Error searching group posts:', error);
+      return {
+        success: false,
+        posts: [],
+        error: 'Failed to search group posts',
       };
     }
   }
@@ -110,25 +178,57 @@ export class FacebookScraperService {
 
   /**
    * Parse posts from API response
+   * API returns { posts: [...] } format
    */
   private parsePosts(data: any): FacebookPost[] {
-    if (!data || !Array.isArray(data.data)) {
+    const rawPosts = data?.posts || data?.results || data?.data;
+    if (!rawPosts || !Array.isArray(rawPosts)) {
       return [];
     }
 
-    return data.data.map((post: any) => ({
-      id: post.id || post.post_id || '',
-      text: post.text || post.message || post.content || '',
+    return rawPosts.map((post: any) => ({
+      id: post.post_id || post.id || '',
+      text: post.message || post.text || post.content || '',
+      url: post.url || '',
       author: {
-        name: post.author?.name || post.user_name || 'Unknown',
-        id: post.author?.id || post.user_id || '',
+        name: post.author?.name || 'Unknown',
+        id: post.author?.id || post.author?.url || '',
       },
-      time: post.time || post.created_time || post.date,
-      images: post.images || post.attachments?.images || [],
-      likes: post.likes || post.reactions?.likes || 0,
-      comments: post.comments || 0,
-      shares: post.shares || 0,
+      time: post.timestamp ? new Date(post.timestamp * 1000).toISOString() : post.time || post.created_time,
+      timestamp: post.timestamp,
+      images: this.extractImages(post),
+      likes: post.reactions_count || post.likes || 0,
+      comments: post.comments_count || post.comments || 0,
+      shares: post.reshare_count || post.shares || 0,
     }));
+  }
+
+  /**
+   * Extract images from various post formats
+   */
+  private extractImages(post: any): string[] {
+    const images: string[] = [];
+
+    // Single image
+    if (post.image?.uri) {
+      images.push(post.image.uri);
+    }
+
+    // Album preview
+    if (Array.isArray(post.album_preview)) {
+      for (const item of post.album_preview) {
+        if (item.image_file_uri) {
+          images.push(item.image_file_uri);
+        }
+      }
+    }
+
+    // Fallback
+    if (images.length === 0 && Array.isArray(post.images)) {
+      return post.images;
+    }
+
+    return images;
   }
 
   /**
@@ -142,25 +242,30 @@ export class FacebookScraperService {
     for (const group of groups) {
       try {
         console.log(`🔍 Scraping group: ${group.name}`);
-        
-        const result = await this.getGroupPosts(group.groupId, 10);
-        
+
+        const result = await this.getGroupPosts(group.groupId);
+
         if (!result.success) {
           console.error(`❌ Failed to scrape group ${group.name}: ${result.error}`);
           continue;
         }
 
+        let newPosts = 0;
         for (const post of result.posts) {
-          await this.processPost(post, group.id, group.name);
+          const created = await this.processPost(post, group);
+          if (created) newPosts++;
         }
 
-        // Update last scraped timestamp
+        // Update last scraped timestamp and stats
         await prisma.facebookGroup.update({
           where: { id: group.id },
-          data: { lastScrapedAt: new Date() },
+          data: {
+            lastScrapedAt: new Date(),
+            totalPosts: { increment: newPosts },
+          },
         });
 
-        console.log(`✅ Scraped ${result.posts.length} posts from ${group.name}`);
+        console.log(`✅ Scraped ${result.posts.length} posts from ${group.name} (${newPosts} new)`);
       } catch (error) {
         console.error(`❌ Error scraping group ${group.name}:`, error);
       }
@@ -168,30 +273,25 @@ export class FacebookScraperService {
   }
 
   /**
-   * Process a single post
+   * Process a single post — returns true if a new listing was created
    */
-  private async processPost(post: FacebookPost, groupId: string, groupName: string): Promise<void> {
+  private async processPost(post: FacebookPost, group: { id: string; name: string; keywords: string[] }): Promise<boolean> {
+    if (!post.id) return false;
+
     // Check if post already exists
     const existing = await prisma.scrapedListing.findUnique({
       where: { postId: post.id },
     });
 
-    if (existing) {
-      return;
-    }
+    if (existing) return false;
 
     // Filter by keywords if configured
-    const group = await prisma.facebookGroup.findUnique({
-      where: { groupId },
-    });
-
-    if (group?.keywords && group.keywords.length > 0) {
+    if (group.keywords.length > 0) {
       const hasKeyword = group.keywords.some(keyword =>
         post.text.toLowerCase().includes(keyword.toLowerCase())
       );
       if (!hasKeyword) {
-        console.log(`⏭️ Post filtered by keywords: ${post.id}`);
-        return;
+        return false;
       }
     }
 
@@ -199,9 +299,10 @@ export class FacebookScraperService {
     await prisma.scrapedListing.create({
       data: {
         source: 'FACEBOOK',
-        groupId,
-        groupName,
+        groupId: group.id,
+        groupName: group.name,
         postId: post.id,
+        postUrl: post.url,
         authorName: post.author?.name,
         authorId: post.author?.id,
         originalText: post.text,
@@ -211,7 +312,7 @@ export class FacebookScraperService {
       },
     });
 
-    console.log(`✨ New listing created: ${post.id}`);
+    return true;
   }
 
   /**

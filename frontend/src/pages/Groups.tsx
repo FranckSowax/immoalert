@@ -26,6 +26,19 @@ interface SearchResult {
   image?: { uri?: string }
 }
 
+interface FacebookPost {
+  id: string
+  text: string
+  url?: string
+  author?: { name: string; id: string }
+  time?: string
+  timestamp?: number
+  images?: string[]
+  likes?: number
+  comments?: number
+  shares?: number
+}
+
 interface ScrapedListing {
   id: string
   originalText: string
@@ -40,6 +53,7 @@ interface ScrapeResult {
   success: boolean
   totalPosts: number
   newPosts: number
+  posts: FacebookPost[]
   listings: ScrapedListing[]
 }
 
@@ -155,7 +169,7 @@ export default function Groups() {
     } catch {
       setScanResults(prev => ({
         ...prev,
-        [groupId]: { success: false, totalPosts: 0, newPosts: 0, listings: [] },
+        [groupId]: { success: false, totalPosts: 0, newPosts: 0, posts: [], listings: [] },
       }))
       setExpandedGroup(groupId)
     } finally {
@@ -382,12 +396,12 @@ export default function Groups() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {result && (
+                      {result && result.posts.length > 0 && (
                         <button
                           onClick={() => setExpandedGroup(isExpanded ? null : group.id)}
                           className="flex items-center text-xs text-primary-600 hover:text-primary-800"
                         >
-                          {result.listings.length} annonce(s)
+                          {result.posts.length} post(s) trouvé(s)
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
                         </button>
                       )}
@@ -412,46 +426,55 @@ export default function Groups() {
                   )}
                 </div>
 
-                {/* Expanded listings */}
-                {isExpanded && result && result.listings.length > 0 && (
+                {/* Expanded posts from scan */}
+                {isExpanded && result && result.posts.length > 0 && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700">Annonces récupérées</h4>
-                      <a
-                        href={`/listings?groupId=${group.id}`}
-                        className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
-                      >
-                        Voir tout <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
+                      <h4 className="text-sm font-semibold text-gray-700">
+                        Posts trouvés ({result.posts.length})
+                        {result.newPosts > 0 && <span className="ml-2 text-emerald-600">dont {result.newPosts} nouvelle(s) annonce(s) sauvegardée(s)</span>}
+                      </h4>
+                      {result.listings.length > 0 && (
+                        <a
+                          href={`/listings?groupId=${group.id}`}
+                          className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
+                        >
+                          Voir les annonces <ExternalLink className="w-3 h-3 ml-1" />
+                        </a>
+                      )}
                     </div>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {result.listings.map((listing) => (
-                        <div key={listing.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                      {result.posts.map((post) => (
+                        <div key={post.id} className="bg-white rounded-lg border border-gray-200 p-4">
                           <div className="flex gap-4">
                             {/* Images */}
-                            {listing.images.length > 0 && (
+                            {post.images && post.images.length > 0 && (
                               <div className="flex-shrink-0 flex gap-1">
-                                {listing.images.slice(0, 2).map((img, i) => (
-                                  <img key={i} src={img} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                                {post.images.slice(0, 2).map((img, i) => (
+                                  <img key={i} src={img} alt="" className="w-16 h-16 rounded-lg object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                                 ))}
-                                {listing.images.length > 2 && (
+                                {post.images.length > 2 && (
                                   <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                                    <Image className="w-4 h-4 mr-0.5" />+{listing.images.length - 2}
+                                    <Image className="w-4 h-4 mr-0.5" />+{post.images.length - 2}
                                   </div>
                                 )}
                               </div>
                             )}
                             {/* Content */}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 line-clamp-3">{listing.originalText}</p>
+                              <p className="text-sm text-gray-800 line-clamp-3">{post.text || '(pas de texte)'}</p>
                               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                                {listing.authorName && <span>{listing.authorName}</span>}
-                                {listing.postedAt && <span>{new Date(listing.postedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
-                                {listing.postUrl && (
-                                  <a href={listing.postUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center">
+                                {post.author?.name && <span className="font-medium">{post.author.name}</span>}
+                                {post.time && <span>{new Date(post.time).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                                {post.url && (
+                                  <a href={post.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center">
                                     Voir sur FB <ExternalLink className="w-3 h-3 ml-0.5" />
                                   </a>
                                 )}
+                                <div className="flex items-center gap-2 ml-auto text-gray-400">
+                                  {post.likes != null && post.likes > 0 && <span>{post.likes} j'aime</span>}
+                                  {post.comments != null && post.comments > 0 && <span>{post.comments} com.</span>}
+                                </div>
                               </div>
                             </div>
                           </div>

@@ -387,6 +387,7 @@ export class AdminController {
         totalPosts: result.posts.length,
         newPosts,
         cursor: result.cursor,
+        posts: result.posts,
         listings,
       });
     } catch (error) {

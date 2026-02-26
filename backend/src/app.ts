@@ -34,13 +34,15 @@ app.use((req, _res, next) => {
 
 // Database connection (lazy, once per cold start)
 let dbConnected = false;
-app.use(async (_req, _res, next) => {
+app.use(async (_req, res, next) => {
   if (!dbConnected) {
     try {
       await connectDatabase();
       dbConnected = true;
     } catch (error) {
       console.error('Database connection failed:', error);
+      res.status(500).json({ error: 'Database connection failed. Check DATABASE_URL env var.' });
+      return;
     }
   }
   next();
@@ -49,12 +51,20 @@ app.use(async (_req, _res, next) => {
 // Routes
 app.use('/api', routes);
 
-// Health check endpoint
+// Health check endpoint — diagnostic info
 app.get('/health', (_req, res) => {
   res.json({
-    status: 'healthy',
+    status: dbConnected ? 'healthy' : 'degraded',
+    database: dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'MISSING',
+      RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'set' : 'MISSING',
+      RAPIDAPI_HOST: process.env.RAPIDAPI_HOST ? 'set' : 'MISSING',
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'set' : 'MISSING',
+      WHAPI_TOKEN: process.env.WHAPI_TOKEN ? 'set' : 'MISSING',
+    },
   });
 });
 

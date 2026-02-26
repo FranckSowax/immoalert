@@ -186,27 +186,36 @@ export class FacebookScraperService {
       return [];
     }
 
-    return rawPosts.map((post: any) => ({
-      id: post.post_id || post.id || '',
-      text: post.message || post.text || post.content || '',
-      url: post.url || '',
-      author: {
-        name: post.author?.name || 'Unknown',
-        id: post.author?.id || post.author?.url || '',
-      },
-      time: post.timestamp ? new Date(post.timestamp * 1000).toISOString() : post.time || post.created_time,
-      timestamp: post.timestamp,
-      images: this.extractImages(post),
-      likes: post.reactions_count || post.likes || 0,
-      comments: post.comments_count || post.comments || 0,
-      shares: post.reshare_count || post.shares || 0,
-    }));
+    return rawPosts.map((post: any) => {
+      const attached = post.attached_post;
+      // For shared posts, message is null — use attached_post.message
+      const text = post.message || post.text || post.content
+        || attached?.message || '';
+      // For shared posts, URL of the original post
+      const url = post.url || attached?.url || '';
+
+      return {
+        id: post.post_id || post.id || '',
+        text,
+        url,
+        author: {
+          name: post.author?.name || 'Unknown',
+          id: post.author?.id || post.author?.url || '',
+        },
+        time: post.timestamp ? new Date(post.timestamp * 1000).toISOString() : post.time || post.created_time,
+        timestamp: post.timestamp,
+        images: this.extractImages(post, attached),
+        likes: post.reactions_count || post.likes || 0,
+        comments: post.comments_count || post.comments || 0,
+        shares: post.reshare_count || post.shares || 0,
+      };
+    });
   }
 
   /**
-   * Extract images from various post formats
+   * Extract images from various post formats, including attached (shared) posts
    */
-  private extractImages(post: any): string[] {
+  private extractImages(post: any, attached?: any): string[] {
     const images: string[] = [];
 
     // Single image
@@ -220,6 +229,21 @@ export class FacebookScraperService {
         if (item.image_file_uri) {
           images.push(item.image_file_uri);
         }
+      }
+    }
+
+    // Video thumbnail
+    if (post.video_thumbnail) {
+      images.push(post.video_thumbnail);
+    }
+
+    // Attached post images (shared posts)
+    if (images.length === 0 && attached) {
+      if (attached.photo_url) {
+        images.push(attached.photo_url);
+      }
+      if (attached.album_url) {
+        images.push(attached.album_url);
       }
     }
 

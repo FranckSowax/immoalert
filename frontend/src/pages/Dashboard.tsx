@@ -181,7 +181,7 @@ export default function Dashboard() {
                       {listing.title || 'Annonce sans titre'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {listing.location} • {listing.price}€
+                      {listing.location} • {listing.price?.toLocaleString()} FCFA
                     </p>
                   </div>
                 </div>

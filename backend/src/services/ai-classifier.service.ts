@@ -44,7 +44,7 @@ ${text}
 Retourne UNIQUEMENT un JSON valide avec ce format exact:
 {
   "title": "titre de l'annonce (max 100 caractères)",
-  "price": nombre entier du prix en euros (null si non trouvé),
+  "price": nombre entier du prix en FCFA (null si non trouvé),
   "location": "ville et/ou quartier précis",
   "surface": nombre entier en m² (null si non trouvé),
   "rooms": nombre de pièces (null si non trouvé),
@@ -56,7 +56,7 @@ Retourne UNIQUEMENT un JSON valide avec ce format exact:
 }
 
 Règles:
-- Pour le prix: extraire uniquement le nombre, sans symboles
+- Pour le prix: extraire uniquement le nombre en FCFA, sans symboles. Les prix sont en Francs CFA (FCFA)
 - Pour propertyType: "HOUSE" pour maison/villa, "APARTMENT" pour appartement
 - Pour furnished: true si meublé, false si non meublé, null si non précisé
 - confidence doit refléter la qualité des données extraites`;
@@ -181,8 +181,8 @@ Format: {"price": number|null, "location": string|null, "surface": number|null, 
       return false;
     }
 
-    // Price should be reasonable (500€ - 50000€)
-    if (data.price && (data.price < 500 || data.price > 50000)) {
+    // Price should be reasonable in FCFA (10 000 - 10 000 000 FCFA)
+    if (data.price && (data.price < 10000 || data.price > 10000000)) {
       return false;
     }
 
@@ -199,14 +199,14 @@ Format: {"price": number|null, "location": string|null, "surface": number|null, 
 
 Détails de l'annonce:
 - Type: ${data.propertyType === 'HOUSE' ? 'Maison' : 'Appartement'}
-- Prix: ${data.price}€
+- Prix: ${data.price} FCFA
 - Surface: ${data.surface}m²
 - Pièces: ${data.rooms}
 - Localisation: ${data.location}
 ${data.furnished ? '- Meublé' : ''}
 
 Critères de l'utilisateur:
-- Budget: ${userCriteria.minPrice}€ - ${userCriteria.maxPrice}€
+- Budget: ${userCriteria.minPrice} - ${userCriteria.maxPrice} FCFA
 - Zones: ${userCriteria.locations?.join(', ')}
 - Type: ${userCriteria.propertyType}
 
@@ -243,7 +243,7 @@ Réponds uniquement avec le texte du message, sans formatage JSON.`;
     return `🏠 *Nouvelle annonce trouvée !*
 
 ${data.propertyType === 'HOUSE' ? '🏡' : '🏢'} ${data.rooms} pièces • ${data.surface}m²
-💰 ${data.price}€
+💰 ${data.price?.toLocaleString()} FCFA
 📍 ${data.location}
 
 Cette annonce correspond à vos critères ! Souhaitez-vous plus d'informations ?`;

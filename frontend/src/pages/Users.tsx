@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Filter, MoreVertical, Phone, MapPin, Euro } from 'lucide-react'
+import { Search, Filter, MoreVertical, Phone, MapPin, Banknote } from 'lucide-react'
 import { api } from '../services/api'
 
 export default function Users() {
@@ -87,8 +87,8 @@ export default function Users() {
                       <span>{user.criteria?.propertyType === 'HOUSE' ? '🏠 Maison' : user.criteria?.propertyType === 'APARTMENT' ? '🏢 Appart' : '🏠🏢 Les deux'}</span>
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
-                      <Euro className="w-3 h-3 mr-1" />
-                      {user.criteria?.minPrice}€ - {user.criteria?.maxPrice}€
+                      <Banknote className="w-3 h-3 mr-1" />
+                      {user.criteria?.minPrice?.toLocaleString()} - {user.criteria?.maxPrice?.toLocaleString()} FCFA
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="w-3 h-3 mr-1" />

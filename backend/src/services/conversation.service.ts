@@ -167,7 +167,7 @@ Pour commencer, dites-moi : cherchez-vous une *maison* 🏡 ou un *appartement* 
         }
         
         context.step = 2;
-        await this.sendMessage(user.whatsappNumber, `Parfait ! Quelle est votre *fourchette de prix* ? 💰\n\nExemples :\n• "Entre 500 et 900 euros"\n• "Maximum 1000€"\n• "600€ minimum"`);
+        await this.sendMessage(user.whatsappNumber, `Parfait ! Quelle est votre *fourchette de prix* en FCFA ? 💰\n\nExemples :\n• "Entre 100000 et 300000 FCFA"\n• "Maximum 500000 FCFA"\n• "150000 FCFA minimum"`);
         break;
 
       case 2: // Price range
@@ -191,7 +191,7 @@ Pour commencer, dites-moi : cherchez-vous une *maison* 🏡 ou un *appartement* 
         }
 
         if (!context.data.minPrice && !context.data.maxPrice) {
-          await this.sendMessage(user.whatsappNumber, 'Je n ai pas compris la fourchette de prix. Pouvez-vous reformuler ?\nExemple : "Entre 500 et 900 euros"');
+          await this.sendMessage(user.whatsappNumber, 'Je n ai pas compris la fourchette de prix. Pouvez-vous reformuler ?\nExemple : "Entre 100000 et 300000 FCFA"');
           return;
         }
 
@@ -349,7 +349,7 @@ Pour commencer, dites-moi : cherchez-vous une *maison* 🏡 ou un *appartement* 
     const statusMessage = `📋 *Vos critères actuels :*
 
 🏠 Type : ${c.propertyType === 'HOUSE' ? 'Maison' : c.propertyType === 'APARTMENT' ? 'Appartement' : 'Les deux'}
-💰 Budget : ${c.minPrice || 'Non défini'}€ - ${c.maxPrice || 'Non défini'}€
+💰 Budget : ${c.minPrice?.toLocaleString() || 'Non défini'} - ${c.maxPrice?.toLocaleString() || 'Non défini'} FCFA
 📍 Zones : ${c.locations.join(', ') || 'Non définies'}
 🚪 Pièces : ${c.minRooms ? c.minRooms + '+' : 'Non défini'}
 📐 Surface : ${c.minSurface ? c.minSurface + 'm²+' : 'Non définie'}
@@ -402,7 +402,7 @@ Que souhaitez-vous faire ?
     const summary = `📋 *Récapitulatif de vos critères :*
 
 🏠 Type : ${data.propertyType === 'HOUSE' ? 'Maison' : data.propertyType === 'APARTMENT' ? 'Appartement' : 'Les deux'}
-💰 Budget : ${data.minPrice}€ - ${data.maxPrice}€
+💰 Budget : ${data.minPrice?.toLocaleString()} - ${data.maxPrice?.toLocaleString()} FCFA
 📍 Zones : ${data.locations?.join(', ')}
 🚪 Pièces : ${data.minRooms ? data.minRooms + '+' : 'Non spécifié'}
 📐 Surface : ${data.minSurface ? data.minSurface + 'm²+' : 'Non spécifiée'}

@@ -92,7 +92,7 @@ export default function Listings() {
 
               <div className="space-y-2 text-sm text-gray-600">
                 {listing.price && (
-                  <p className="font-semibold text-primary-600">{listing.price.toLocaleString()}€</p>
+                  <p className="font-semibold text-primary-600">{listing.price.toLocaleString()} FCFA</p>
                 )}
                 {listing.location && <p>📍 {listing.location}</p>}
                 {listing.surface && <p>📐 {listing.surface}m²</p>}

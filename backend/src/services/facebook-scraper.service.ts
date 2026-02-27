@@ -1,6 +1,20 @@
 import axios, { AxiosInstance } from 'axios';
 import { prisma } from '../config/database';
 
+// Default real estate keywords for Gabon/Africa — used when group has no custom keywords
+export const DEFAULT_IMMO_KEYWORDS = [
+  'louer', 'location', 'à louer', 'a louer',
+  'vendre', 'vente', 'à vendre', 'a vendre',
+  'appartement', 'appart', 'maison', 'villa', 'studio', 'duplex', 'triplex',
+  'chambre', 'salon', 'cuisine', 'douche', 'toilette',
+  'meublé', 'non meublé', 'meuble', 'non meuble',
+  'loyer', 'bail', 'caution', 'frais d\'agence',
+  'fcfa', 'cfa', 'f cfa',
+  'terrain', 'parcelle', 'immeuble',
+  'pièces', 'pieces', 'chambres',
+  'résidence', 'residence',
+];
+
 export interface FacebookPost {
   id: string;
   text: string;
@@ -140,6 +154,7 @@ export class FacebookScraperService {
     const allPosts: FacebookPost[] = [];
     let currentCursor: string | undefined;
     let lastCursor: string | null = null;
+    const cutoff48h = Date.now() - 48 * 60 * 60 * 1000;
 
     for (let page = 0; page < maxPages; page++) {
       const result = await this.getGroupPostsPage(groupId, currentCursor);
@@ -149,10 +164,20 @@ export class FacebookScraperService {
         break;
       }
 
-      allPosts.push(...result.posts);
+      // Filter: only posts from last 48 hours
+      let hasOldPost = false;
+      for (const post of result.posts) {
+        if (post.timestamp && post.timestamp * 1000 < cutoff48h) {
+          hasOldPost = true;
+          continue;
+        }
+        allPosts.push(post);
+      }
+
       lastCursor = result.cursor || null;
 
-      if (!result.cursor || result.posts.length === 0) break;
+      // Stop paginating if we hit old posts or no more pages
+      if (hasOldPost || !result.cursor || result.posts.length === 0) break;
       currentCursor = result.cursor;
     }
 
@@ -307,8 +332,8 @@ export class FacebookScraperService {
 
         let newPosts = 0;
         for (const post of result.posts) {
-          const created = await this.processPost(post, group);
-          if (created) newPosts++;
+          const listingId = await this.processPost(post, group);
+          if (listingId) newPosts++;
         }
 
         // Update last scraped timestamp and stats
@@ -330,28 +355,18 @@ export class FacebookScraperService {
   /**
    * Process a single post — returns true if a new listing was created
    */
-  async processPost(post: FacebookPost, group: { id: string; name: string; keywords: string[] }): Promise<boolean> {
-    if (!post.id) return false;
+  async processPost(post: FacebookPost, group: { id: string; name: string; keywords: string[] }): Promise<string | null> {
+    if (!post.id || !post.text) return null;
 
     // Check if post already exists
     const existing = await prisma.scrapedListing.findUnique({
       where: { postId: post.id },
     });
 
-    if (existing) return false;
-
-    // Filter by keywords if configured
-    if (group.keywords.length > 0) {
-      const hasKeyword = group.keywords.some(keyword =>
-        post.text.toLowerCase().includes(keyword.toLowerCase())
-      );
-      if (!hasKeyword) {
-        return false;
-      }
-    }
+    if (existing) return null;
 
     // Create new listing
-    await prisma.scrapedListing.create({
+    const listing = await prisma.scrapedListing.create({
       data: {
         source: 'FACEBOOK',
         groupId: group.id,
@@ -367,7 +382,7 @@ export class FacebookScraperService {
       },
     });
 
-    return true;
+    return listing.id;
   }
 
   /**

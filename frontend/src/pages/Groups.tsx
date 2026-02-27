@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Facebook, Trash2, CheckCircle, XCircle, Plus, Link, X, Tag, Search, Loader2, Users, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Image } from 'lucide-react'
+import { Facebook, Trash2, CheckCircle, XCircle, Plus, Link, X, Tag, Search, Loader2, Users, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Image, Edit3, Save } from 'lucide-react'
 import { api } from '../services/api'
 
 interface Group {
@@ -84,6 +84,10 @@ export default function Groups() {
   const [scanResults, setScanResults] = useState<Record<string, ScrapeResult>>({})
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
 
+  // Edit keywords state
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [editKeywords, setEditKeywords] = useState('')
+
   const queryClient = useQueryClient()
 
   const { data: groupsData, isLoading } = useQuery({
@@ -117,6 +121,16 @@ export default function Groups() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       api.put(`/admin/groups/${id}`, { isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['groups'] }),
+  })
+
+  const updateGroupKeywords = useMutation({
+    mutationFn: ({ id, keywords }: { id: string; keywords: string[] }) =>
+      api.put(`/admin/groups/${id}`, { keywords }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      setEditingGroupId(null)
+      setEditKeywords('')
+    },
   })
 
   const handleAdd = () => {
@@ -176,6 +190,19 @@ export default function Groups() {
     } finally {
       setScanningGroupId(null)
     }
+  }
+
+  const startEditKeywords = (group: Group) => {
+    setEditingGroupId(group.id)
+    setEditKeywords(group.keywords.join(', '))
+  }
+
+  const saveKeywords = (groupId: string) => {
+    const keywords = editKeywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(k => k)
+    updateGroupKeywords.mutate({ id: groupId, keywords })
   }
 
   return (
@@ -296,7 +323,7 @@ export default function Groups() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1"><Tag className="w-4 h-4 inline mr-1" />Mots-clés de filtrage (séparés par des virgules)</label>
               <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="location, appartement, maison, studio, villa" value={keywordsInput} onChange={(e) => setKeywordsInput(e.target.value)} />
-              <p className="text-xs text-gray-400 mt-1">Seuls les posts contenant au moins un de ces mots-clés seront récupérés. Laissez vide pour tout récupérer.</p>
+              <p className="text-xs text-gray-400 mt-1">Laissez vide pour utiliser les mots-clés immobilier par défaut (louer, vendre, appartement, maison, villa, studio...)</p>
             </div>
             {keywordsInput && (
               <div className="flex flex-wrap gap-2">
@@ -337,6 +364,7 @@ export default function Groups() {
             const isScanning = scanningGroupId === group.id
             const result = scanResults[group.id]
             const isExpanded = expandedGroup === group.id
+            const isEditing = editingGroupId === group.id
 
             return (
               <div key={group.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -379,15 +407,67 @@ export default function Groups() {
                     </div>
                   </div>
 
-                  {group.keywords.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {group.keywords.map((keyword, idx) => (
-                          <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{keyword}</span>
-                        ))}
+                  {/* Keywords section — editable */}
+                  <div className="mb-4">
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                          <Tag className="w-3 h-3" /> Mots-clés (séparés par des virgules)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="location, appartement, maison, villa, studio, loyer..."
+                            value={editKeywords}
+                            onChange={(e) => setEditKeywords(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveKeywords(group.id)}
+                          />
+                          <button
+                            onClick={() => saveKeywords(group.id)}
+                            disabled={updateGroupKeywords.isPending}
+                            className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            {updateGroupKeywords.isPending ? '...' : 'Sauver'}
+                          </button>
+                          <button
+                            onClick={() => { setEditingGroupId(null); setEditKeywords('') }}
+                            className="px-3 py-1.5 text-gray-500 text-sm rounded-lg hover:bg-gray-100"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                        {editKeywords && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {editKeywords.split(',').map(k => k.trim()).filter(k => k).map((kw, i) => (
+                              <span key={i} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{kw}</span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-400">Laissez vide pour utiliser les mots-clés immobilier par défaut.</p>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap gap-1.5 flex-1">
+                          {group.keywords.length > 0 ? (
+                            group.keywords.map((keyword, idx) => (
+                              <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{keyword}</span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Mots-clés immobilier par défaut</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => startEditKeywords(group)}
+                          className="text-gray-400 hover:text-primary-600 transition-colors"
+                          title="Modifier les mots-clés"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -421,10 +501,10 @@ export default function Groups() {
                       {result.success ? (
                         <span>
                           {result.totalFetched != null && result.totalFetched !== result.totalPosts
-                            ? <>{result.totalFetched} post(s) scannés, <strong>{result.totalPosts} annonce(s) pertinente(s)</strong></>
-                            : <>{result.totalPosts} annonce(s) trouvée(s)</>
+                            ? <>{result.totalFetched} post(s) scannés (48h), <strong>{result.totalPosts} annonce(s) immobilier</strong></>
+                            : <>{result.totalPosts} annonce(s) trouvée(s) (48h)</>
                           }
-                          {result.newPosts > 0 && <>, <strong>{result.newPosts} nouvelle(s)</strong> sauvegardée(s)</>}
+                          {result.newPosts > 0 && <>, <strong>{result.newPosts} nouvelle(s)</strong> sauvegardée(s) + classification IA</>}
                         </span>
                       ) : (
                         <span>Erreur lors du scan. Vérifiez l'ID du groupe.</span>
@@ -438,8 +518,8 @@ export default function Groups() {
                   <div className="border-t border-gray-100 bg-gray-50 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-gray-700">
-                        Posts trouvés ({result.posts.length})
-                        {result.newPosts > 0 && <span className="ml-2 text-emerald-600">dont {result.newPosts} nouvelle(s) annonce(s) sauvegardée(s)</span>}
+                        Annonces immobilier ({result.posts.length})
+                        {result.newPosts > 0 && <span className="ml-2 text-emerald-600">dont {result.newPosts} nouvelle(s)</span>}
                       </h4>
                       {result.listings.length > 0 && (
                         <a

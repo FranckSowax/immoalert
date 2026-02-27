@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/database';
-import { facebookScraperService } from '../services/facebook-scraper.service';
+import { facebookScraperService, DEFAULT_IMMO_KEYWORDS } from '../services/facebook-scraper.service';
 import { aiClassifierService } from '../services/ai-classifier.service';
 import { matchingService } from '../services/matching.service';
 
@@ -360,18 +360,18 @@ export class AdminController {
         return;
       }
 
-      // Filter posts by group keywords (if configured)
-      const keywords = group.keywords || [];
-      const filteredPosts = keywords.length > 0
-        ? result.posts.filter(post =>
-            keywords.some(kw => post.text.toLowerCase().includes(kw.toLowerCase()))
-          )
-        : result.posts;
+      // Use group keywords, or default immobilier keywords if none configured
+      const keywords = group.keywords.length > 0 ? group.keywords : DEFAULT_IMMO_KEYWORDS;
+      const filteredPosts = result.posts.filter(post => {
+        const textLower = post.text.toLowerCase();
+        return keywords.some(kw => textLower.includes(kw.toLowerCase()));
+      });
 
-      let newPosts = 0;
+      // Save filtered posts to DB
+      const newListingIds: string[] = [];
       for (const post of filteredPosts) {
-        const created = await facebookScraperService.processPost(post, group);
-        if (created) newPosts++;
+        const listingId = await facebookScraperService.processPost(post, group);
+        if (listingId) newListingIds.push(listingId);
       }
 
       // Update group stats
@@ -379,9 +379,14 @@ export class AdminController {
         where: { id },
         data: {
           lastScrapedAt: new Date(),
-          totalPosts: { increment: newPosts },
+          totalPosts: { increment: newListingIds.length },
         },
       });
+
+      // Auto-enrich new listings with AI (fire-and-forget for speed)
+      if (newListingIds.length > 0) {
+        this.enrichListingsAsync(newListingIds);
+      }
 
       // Fetch the latest listings for this group to return
       const listings = await prisma.scrapedListing.findMany({
@@ -394,7 +399,7 @@ export class AdminController {
         success: true,
         totalFetched: result.posts.length,
         totalPosts: filteredPosts.length,
-        newPosts,
+        newPosts: newListingIds.length,
         cursor: result.cursor,
         posts: filteredPosts,
         listings,
@@ -404,6 +409,24 @@ export class AdminController {
       const errMsg = error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: 'Failed to scrape group', details: errMsg });
     }
+  }
+
+  /**
+   * Enrich listings with AI in background (fire-and-forget)
+   */
+  private enrichListingsAsync(listingIds: string[]): void {
+    (async () => {
+      for (const id of listingIds) {
+        try {
+          const listing = await prisma.scrapedListing.findUnique({ where: { id } });
+          if (listing && !listing.aiEnriched) {
+            await aiClassifierService.enrichListing(listing);
+          }
+        } catch (error) {
+          console.error(`Error enriching listing ${id}:`, error);
+        }
+      }
+    })().catch(err => console.error('Background enrichment failed:', err));
   }
 
   /**
